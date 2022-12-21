@@ -69,6 +69,8 @@ module Fold =
             | FeedContinued -> Active feed
             | ev -> failwithf "Unexpected %A" ev
 
+    let fold: Feed -> FeedEvents seq -> Feed = Seq.fold evolve
+
 module Decisions =
     let addFeed data state =
         match state with
@@ -78,6 +80,6 @@ module Decisions =
 
     let addEpisode data state =
         match state with
-        | Fold.Active state -> Events.EpisodeAdded data
+        | Fold.Active state -> [ Events.EpisodeAdded data ]
         | Fold.Initial -> failwith "Feed not found"
         | Fold.Paused _ -> failwith "Feed is paused"
