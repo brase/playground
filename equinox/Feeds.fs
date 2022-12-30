@@ -35,6 +35,14 @@ module Fold =
           Length: int
           ReleaseDate: System.DateTime
           Episode: int }
+        static member create (ev:EpisodeAdded) =
+            { Guid = ev.Guid
+              Url = ev.Url
+              MediaUrl = ev.Url
+              Title = ev.Title
+              Length = ev.Length
+              ReleaseDate = ev.ReleaseDate
+              Episode = ev.Episode }
 
     and State =
         { Url: string
@@ -61,7 +69,7 @@ module Fold =
             | ev -> failwithf "Unexpected %A" ev
         | Active feed ->
             match event with
-            | EpisodeAdded ev -> Active { feed with Episodes = feed.Episodes @ [] }
+            | EpisodeAdded ev -> Active { feed with Episodes = feed.Episodes @ [Episode.create ev] }
             | FeedPaused -> Paused feed
             | ev -> failwithf "Unexpected %A" ev
         | Paused feed ->
@@ -78,8 +86,13 @@ module Decisions =
         | Fold.Active state when state.Url = data.Url -> []
         | _ -> failwith "Feed already exists"
 
-    let addEpisode data state =
+    let addEpisode (data: Events.EpisodeAdded) state =
         match state with
-        | Fold.Active state -> [ Events.EpisodeAdded data ]
+        | Fold.Active (state: Fold.State) -> 
+            let found = state.Episodes 
+                                     |> List.tryFindIndex (fun x -> x.Guid = data.Guid)
+            match found with
+            | None -> [ Events.EpisodeAdded data ]
+            | Some _ -> []
         | Fold.Initial -> failwith "Feed not found"
         | Fold.Paused _ -> failwith "Feed is paused"

@@ -29,7 +29,6 @@ let ``Adding a feed`` data =
 [<Property>]
 let ``Adding an episode`` added data =
   test <@ [FeedAdded added] => Decisions.addEpisode data = [ EpisodeAdded data]  @>
-  //TODO: idempotence!
-  //test <@ [FeedAdded added; EpisodeAdded data] => Decisions.addEpisode data = [ ]  @>
+  test <@ [FeedAdded added; EpisodeAdded data] => Decisions.addEpisode data = [ ]  @>
   raises <@ [FeedAdded added; FeedPaused] => Decisions.addEpisode data = [] @>
   raises <@ [] => Decisions.addEpisode data = [] @>
