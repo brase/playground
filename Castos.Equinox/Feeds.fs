@@ -35,7 +35,8 @@ module Fold =
           Length: int
           ReleaseDate: System.DateTime
           Episode: int }
-        static member create (ev:EpisodeAdded) =
+
+        static member create(ev: EpisodeAdded) =
             { Guid = ev.Guid
               Url = ev.Url
               MediaUrl = ev.Url
@@ -69,7 +70,7 @@ module Fold =
             | ev -> failwithf "Unexpected %A" ev
         | Active feed ->
             match event with
-            | EpisodeAdded ev -> Active { feed with Episodes = feed.Episodes @ [Episode.create ev] }
+            | EpisodeAdded ev -> Active { feed with Episodes = feed.Episodes @ [ Episode.create ev ] }
             | FeedPaused -> Paused feed
             | ev -> failwithf "Unexpected %A" ev
         | Paused feed ->
@@ -88,11 +89,40 @@ module Decisions =
 
     let addEpisode (data: Events.EpisodeAdded) state =
         match state with
-        | Fold.Active (state: Fold.State) -> 
-            let found = state.Episodes 
-                                     |> List.tryFindIndex (fun x -> x.Guid = data.Guid)
+        | Fold.Active(state: Fold.State) ->
+            let found = state.Episodes |> List.tryFindIndex (fun x -> x.Guid = data.Guid)
+
             match found with
             | None -> [ Events.EpisodeAdded data ]
             | Some _ -> []
         | Fold.Initial -> failwith "Feed not found"
         | Fold.Paused _ -> failwith "Feed is paused"
+
+open FSharp.UMX
+
+type FeedId = Guid<feedId>
+and [<Measure>] feedId
+
+module FeedId =
+    let inline ofGuid (g: Guid) : FeedId = %g
+    let inline parse (s: string) = Guid.Parse s |> ofGuid
+    let inline toGuid (id: FeedId) : Guid = %id
+    // We choose the dashless N format to make the distinct parts of the stream's ID
+    // easier for humans to read
+    let inline toString (id: FeedId) = (toGuid id).ToString("N")
+
+[<Literal>]
+let Category = "Feed"
+
+let streamId = Equinox.StreamId.gen FeedId.toString
+
+type Service internal (resolve: FeedId -> Equinox.Decider<Events.FeedEvents, Fold.Feed>) =
+    member _.AddFeed(id, data) =
+        let decider = resolve id
+        decider.Transact(Decisions.addFeed data)
+
+    member _.AddEpisode(id, data) =
+        let decider = resolve id
+        decider.Transact(Decisions.addEpisode data)
+
+let create resolve = Service(streamId >> resolve Category)
